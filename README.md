@@ -1,5 +1,5 @@
 Data Science Pet Projects
 
-- [English exercises](https://github.com/EVD-23/pet-projects/tree/main/english_exercises_app)
+- [Приложение для генерации упражнений по английскому языку](https://github.com/EVD-23/pet-projects/tree/main/english_exercises_app)
 
   
