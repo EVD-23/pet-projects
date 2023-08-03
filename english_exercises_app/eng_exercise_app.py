@@ -18,7 +18,7 @@ from lemminflect import getAllInflections
 
 import pysbd
 
-import gensim.downloader as api
+# import gensim.downloader as api
 
 
 # In[2]:
