@@ -1,50 +1,33 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-# In[1]:
-
-
-import streamlit as st
-
 import pandas as pd
 import numpy as np
-
-import en_core_web_sm
-
 import random
 
+import streamlit as st
+from streamlit_js_eval import streamlit_js_eval
 import spacy
-from lemminflect import getAllInflections
-
+import en_core_web_sm
 import pysbd
-
-# import gensim.downloader as api
-
-
-# In[2]:
-
+from lemminflect import getAllInflections
+import inflect
 
 MAX_CH = 10000
 
 
-# In[3]:
-
-
-# класс для генерации упражнений
-
+# class for generating exercises
 class ExerciseGenerator:
     def __init__(self):
         self.__file_content = ''
         self.__nlp = spacy.load('en_core_web_sm')
         self.__data_frame = None
-    
-#     def load_text(self, file_path): # предварительно загруженные файл 
-#         with open(file_path, 'r') as file:
-#             self.__file_content = file.read()    
-     
-    def load_text(self, text): # загрузка файда из формы 
+
+    #upload text from the form
+    def load_text(self, text): 
          self.__file_content = text
             
+    #split text by sentence
     def split_by_sentence(self):
         if self.__nlp(self.__file_content):
             seg = pysbd.Segmenter(language="en", clean=False)
@@ -58,7 +41,7 @@ class ExerciseGenerator:
             
         return self.__data_frame    
 
-    
+    #split sentence by word
     def split_sentence_by_word(self):
         if self.__data_frame is not None:
             self.__data_frame['words'] = ''
@@ -74,11 +57,11 @@ class ExerciseGenerator:
                 tag = []
                 dep = []
                 for i, token in enumerate(current_doc):
-                    text.append(token.text) # делим на слова
-                    lemma.append(token.lemma_) # выделяем первоначальную форму слова
-                    pos.append(token.pos_) # выделяем части речи
-                    tag.append(token.tag_) # выделяем мелкие части речи 
-                    dep.append(token.dep_) # выделяем роль в редложении
+                    text.append(token.text) 
+                    lemma.append(token.lemma_) 
+                    pos.append(token.pos_) 
+                    tag.append(token.tag_)  
+                    dep.append(token.dep_) 
                 self.__data_frame.at[index, 'words'] = text
                 self.__data_frame.at[index, 'num_of_words'] = len(text)
                 self.__data_frame.at[index, 'lemma'] = lemma
@@ -90,11 +73,12 @@ class ExerciseGenerator:
         
         return self.__data_frame
     
-    def choose_correct_verb(self, count=5):
+    #choose correct verb
+    def choose_correct_verb(self, count=5, ):
         if self.__data_frame is not None:
             required_parts_of_speech = ['VERB']
             exercises_data_frame = self.__data_frame.loc[self.__data_frame.apply(
-                lambda p: all(x in p['pos'] for x  in required_parts_of_speech), axis=1)].sample(count, random_state = 42)
+                lambda p: all(x in p['pos'] for x  in required_parts_of_speech), axis=1)].sample(count, random_state=42)
             
             exercises_data_frame.reset_index(drop=True, inplace=True)
             exercises_data_frame = exercises_data_frame.apply(self.__choose_correct_verb, axis=1)
@@ -122,18 +106,17 @@ class ExerciseGenerator:
         row['sentence_without_word'] = sentence_without_word
         row['answer'] = verb
         row['options'] = options
-        row['description'] = 'Выберите слово'
-        row['exercise_type'] = 'select_word'
         row['result'] = ['']
         row['total'] = 0
         
         return row
     
+    #choose correct adj exercise
     def choose_correct_adj(self, count=5):
         if self.__data_frame is not None:
             required_parts_of_speech = ['ADJ']
             exercises_data_frame = self.__data_frame.loc[self.__data_frame.apply(
-                lambda p: all(x in p['pos'] for x  in required_parts_of_speech), axis=1)].sample(count, random_state = 42)
+                lambda p: all(x in p['pos'] for x  in required_parts_of_speech), axis=1)].sample(count, random_state=42)
             
             exercises_data_frame.reset_index(drop=True, inplace=True)
             exercises_data_frame = exercises_data_frame.apply(self.__choose_correct_adj, axis=1)
@@ -164,62 +147,174 @@ class ExerciseGenerator:
         row['sentence_without_word'] = sentence_without_word
         row['answer'] = adj
         row['options'] = options
-        row['description'] = 'Выберите слово'
-        row['exercise_type'] = 'select_word'
-        row['result'] = inflections
+        row['result'] = ['']
         row['total'] = 0
         
         return row
     
+    #choose correct det exercise
+    def choose_correct_det(self, count=5):
+        if self.__data_frame is not None:
+            required_parts_of_speech = ['det']
+            exercises_data_frame = self.__data_frame.loc[self.__data_frame.apply(
+                lambda p: all(x in p['dep'] for x  in required_parts_of_speech), axis=1)].sample(count, random_state = 42)
+            
+            exercises_data_frame.reset_index(drop=True, inplace=True)
+            exercises_data_frame = exercises_data_frame.apply(self.__choose_correct_det, axis=1)
+            exercises_data_frame.drop(['lemma', 'pos', 'tag', 'dep', 'words'], axis=1, inplace=True)
+        
+            return exercises_data_frame
+    
+    @staticmethod
+    def __choose_correct_det(row):
+        det_index = row['dep'].index('det')
+        det = row['words'][det_index]
+        sentence_without_word = ' '.join(row['words'][:det_index] + ['...'] + row['words'][det_index + 1:])
+        options = ['a', 'an', 'the']
+        options.append(det)
+        
+        if det.istitle():
+            options = [x.title() for x in options]
+        
+        options = list(set(options))
+       
+        row['sentence_without_word'] = sentence_without_word
+        row['answer'] = det
+        row['options'] = options
+        row['result'] = ['']
+        row['total'] = 0
+        
+        return row
+    
+    #word formation exercise
+    def make_up_word(self, count=5):
+        if self.__data_frame is not None:
+            required_parts_of_speech = ['NOUN']
+            exercises_data_frame = self.__data_frame.loc[self.__data_frame.apply(
+                lambda p: all(x in p['pos'] for x in required_parts_of_speech), axis=1)].sample(count, random_state=42)
 
+            exercises_data_frame.reset_index(drop=True, inplace=True)
+            exercises_data_frame = exercises_data_frame.apply(self.__make_up_word, axis=1)
+            exercises_data_frame.drop(['lemma', 'pos', 'tag', 'dep', 'words'], axis=1, inplace=True)
 
-# In[4]:
+            return exercises_data_frame
+    
+    @staticmethod
+    def __make_up_word(row):
+        noun_index = row['pos'].index('NOUN')
+        word = row['words'][noun_index]
+        sentence_without_word = ' '.join(row['words'][:noun_index] + ['...'] + row['words'][noun_index + 1:])
+        options = ''.join(random.sample(word,len(word)))
 
+        row['sentence_without_word'] = sentence_without_word
+        row['answer'] = word
+        row['options'] = options
+        row['result'] = ['']
+        row['total'] = 0
+        
+        return row
+    
+    #plural exercise
+    def make_up_plural(self, count=5):
+        if self.__data_frame is not None:
+            required_parts_of_speech = ['NOUN']
+            exercises_data_frame = self.__data_frame.loc[self.__data_frame.apply(
+                lambda p: all(x in p['pos'] for x in required_parts_of_speech), axis=1)].sample(count, random_state=42)
+            
+            exercises_data_frame.reset_index(drop=True, inplace=True)
+            exercises_data_frame = exercises_data_frame.apply(self.__make_up_plural, axis=1)
+            exercises_data_frame.drop(['lemma', 'pos', 'tag', 'dep', 'words'], axis=1, inplace=True)
+        
+            return exercises_data_frame
+    
+    @staticmethod
+    def __make_up_plural(row):
+        noun_index = row['pos'].index('NOUN')
+        word = row['lemma'][noun_index]
+        
+        if word.istitle():
+            word = word.lower()
+            
+        engine = inflect.engine()
+        answer = engine.plural(word)
+                
+        row['answer'] = answer
+        row['options'] = word
+        row['result'] = ['']
+        row['total'] = 0
+        
+        return row
+    
+# streamlit app
+def disable():
+    if len(text) > 0:
+        st.session_state.disabled = True
 
-# streamlit приложение
-
+if "disabled" not in st.session_state:
+    st.session_state.disabled = False
+    
+#main header
 st.header('Генератор упражнений по английскому')
 
+#streamlit form 
 with st.form("my_form"):
+    st.subheader('Вставьте текст на английском языке')
     text = st.text_area(f"Максимальное кол-во символов в тексте не должно превышать {MAX_CH}",
                 placeholder="Вставьте текст...",
                 max_chars=MAX_CH,
                 height=100)
-    submit_text = st.form_submit_button('Сгенерировать')
+    
+    example = st.radio("Или выберите из предложенных ниже 👇",
+                       ("Не использовать предложенные тексты",
+                        "'Little Red Cap' Jacob_and_Wilhelm_Grimm", 
+                        "'Little Red Riding' Hood Charles Perrault"))
+    
+    if example == "'Little Red Cap' Jacob_and_Wilhelm_Grimm":
+        with open(r"https://github.com/EVD-23/pet-projects/blob/main/english_exercises_app/red_hat/Little_Red_Cap_%20Jacob_and_Wilhelm_Grimm.txt") as f:
+            text = f.read()
+    elif example == "'Little Red Riding' Hood Charles Perrault":
+        with open(r"https://github.com/EVD-23/pet-projects/blob/main/english_exercises_app/red_hat/Little_Red_Riding_Hood_Charles_Perrault.txt") as f:
+            text = f.read()
+    else:
+        pass
+    
+    st.subheader('Выберите тип упражнений')
+    option_one = st.checkbox('Выбор правильной формы глагола', value=True)
+    option_two = st.checkbox('Выбор правильной формы прилагательного')
+    option_three = st.checkbox('Выбор правильного артикля')
+    option_four = st.checkbox('Составление слов из букв')
+    option_five = st.checkbox('Образуйте множественное число существительного')
+    
+    st.subheader('Выберите количество упражнений:')
+    num_of_exercise = st.slider('Установите диапазон от 1-10', 1, 10, 1)
+    
+    submit_text = st.form_submit_button('Сгенерировать', on_click=disable, disabled=st.session_state.disabled)
     st.caption('*Нажмите кнопку что-бы сгенерировать упражнения')
     
+    if len(text) == 0:
+        st.write("*Вставьте английский текст в поле выше или выберите один из предложенных вариантов")
+
+'---' 
+
+#split sentence by word using class ExerciseGenerator
 try:
     if text:
-        with st.form("my_form_checkbox"):
-            st.subheader('Выберите тип упражнений')
-            option_one = st.checkbox('Выбор правильной формы глагола')
-            option_two = st.checkbox('Выбор правильной формы прилагательного')
-            option_three = st.checkbox('Создание неправильных предложений')
-            option_four = st.checkbox('Задача с пропусками')
-            st.subheader('Выберите количество упражнений:')
-            num_of_exercise = st.slider('Установите диапазон от 1-10', 1, 10, 1)
-            submit_type = st.form_submit_button('Далее')
-            if submit_type:
-                num = num_of_exercise
+        num = num_of_exercise
+        eg = ExerciseGenerator()
+        eg.load_text(text)
+        eg.split_by_sentence()
+        eg.split_sentence_by_word()
 except:
     pass
 
-try:
-    eg = ExerciseGenerator()
-    eg.load_text(text)
-    eg.split_by_sentence()
-    eg.split_sentence_by_word()
-except:
-    pass
-    
+#output exercise type one
 try:
     if option_one:
-        
-        '---'
-        
         exercise_one = eg.choose_correct_verb(num)
         tasks_one = exercise_one.to_dict('records')
         st.subheader('Выберите правильную форму глаголов:')
+        count_one = 0
+
         for task in tasks_one:
             col1, col2 = st.columns(2)
             with col1:
@@ -229,24 +324,29 @@ try:
             with col2:
                 option = task['options']
                 task['result'] = st.selectbox('nolabel', 
-                                                 ['–––'] + option, 
-                                                 label_visibility="hidden")
+                                             ['–––'] + option, 
+                                             label_visibility="hidden", 
+                                             key=count_one)
+                count_one += 1
+
                 if task['result'] == '–––':
                     pass
                 elif task['result'] == task['answer']:
                     st.success('', icon="✅")
-                    task['total'] = 1
                 else:
                     st.error('', icon="😟")
-        
-                    
+
+        '---' 
+except:
+    pass
+
+#output exercise type two
+try:
     if option_two:
-        
-        '---'
-        
         exercise_two = eg.choose_correct_adj(num)
         tasks_two = exercise_two.to_dict('records')
         st.subheader('Выберите правильную форму прилагательного:')
+        count_two = 11
         for task in tasks_two:
             col1, col2 = st.columns(2)
             with col1:
@@ -256,8 +356,11 @@ try:
             with col2:
                 option = task['options']
                 task['result'] = st.selectbox('nolabel_two', 
-                                                 ['–––'] + option, 
-                                                 label_visibility="hidden")
+                                             ['–––'] + option, 
+                                             label_visibility="hidden", 
+                                             key=count_two)
+                count_two +=1
+
                 if task['result'] == '–––':
                     pass
                 elif task['result'] == task['answer']:
@@ -265,15 +368,18 @@ try:
                     task['total'] = 1
                 else:
                     st.error('', icon="😟")
-        
 
+        '---' 
+except:
+    pass
+
+#output exercise type three
+try:
     if option_three:
-        
-        '---'
-        
-        exercise_three = eg.choose_correct_verb(num)
+        exercise_three = eg.choose_correct_det(num)
         tasks_three = exercise_three.to_dict('records')
-        st.subheader('Выберите правильные предложения')
+        st.subheader('Выберите правильный артикль')
+        count_three = 21
 
         for task in tasks_three:
             col1, col2 = st.columns(2)
@@ -284,51 +390,87 @@ try:
             with col2:
                 option = task['options']
                 task['result'] = st.selectbox('nolabel_three', 
-                                                 ['–––'] + option, 
-                                                 label_visibility="hidden")
+                                             ['–––'] + option, 
+                                             label_visibility="hidden", 
+                                             key=count_three)
+                count_three +=1
+
                 if task['result'] == '–––':
                     pass
                 elif task['result'] == task['answer']:
                     st.success('', icon="✅")
                     task['total'] = 1
                 else:
-                    st.error('', icon="😟")
-        
-    
-    if option_four: 
-        
+                    st.error('', icon="😟")                    
+
         '---'
-        
-        exercise_four = eg.choose_correct_verb(num)
+except:
+    pass
+
+#output exercise type four
+try:
+    if option_four: 
+        exercise_four = eg.make_up_word(num)
         tasks_four = exercise_four.to_dict('records')
-        st.subheader('Заполните пропуски')
+        st.subheader('Составьте слово')
+        count_four = 31
+        
         for task in tasks_four:
             col1, col2 = st.columns(2)
             with col1:
-                st.write('')
+                option = task['options']
+                st.write(f'Буквы  - {option}')
                 st.write(str(task['sentence_without_word']))
 
             with col2:
-                option = task['options']
-                task['result'] = st.selectbox('nolabel_four', 
-                                                 ['–––'] + option, 
-                                                 label_visibility="hidden")
-                if task['result'] == '–––':
-                    pass
-                elif task['result'] == task['answer']:
+                answer = task['answer']
+                text_input = st.text_input("Введите слово 👇", key=count_four)   
+                count_four +=1
+                
+                if text_input == answer:
                     st.success('', icon="✅")
                     task['total'] = 1
+                elif len(text_input) < 1:
+                    pass
                 else:
-                    st.error('', icon="😟")
+                    st.error(f'Это было слово {answer}', icon="😟")
                     
-    '---'
+        '---'
 
 except:
     pass
 
+#output exercise type five
+try:
+    if option_five: 
+        exercise_five = eg.make_up_plural(num)
+        tasks_five = exercise_five.to_dict('records')
+        st.subheader('Образуйте множественное число')
+        count_five = 41
+        
+        for task in tasks_five:
+            col1, col2 = st.columns(2)
+            with col1:
+                option = task['options']
+                st.write(f'Слово  - {option}')
+                
+            with col2:
+                answer = task['answer']
+                text_input = st.text_input("Введите слово или '-' в поле 👇", key=count_five)   
+                count_five +=1
+                
+                if text_input == answer:
+                    st.success('', icon="✅")
+                    task['total'] = 1
+                elif len(text_input) < 1:
+                    pass
+                else:
+                    st.error(f'Это было слово {answer}', icon="😟")
+                    
+        '---'
+except:
+    pass
 
-# In[ ]:
-
-
-
-
+#reset button
+if st.button('Загрузить новый текст'):
+    streamlit_js_eval(js_expressions="parent.window.location.reload()")
