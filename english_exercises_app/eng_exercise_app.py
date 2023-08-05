@@ -427,7 +427,7 @@ try:
 
             with col2:
                 answer = task['answer']
-                text_input = st.text_input("Введите слово 👇", key=count_four)   
+                text_input = st.text_input("Введите слово или '-' в поле👇", key=count_four)   
                 count_four +=1
                 
                 if text_input == answer:
