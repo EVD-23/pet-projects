@@ -143,6 +143,9 @@ class ExerciseGenerator:
                 options.append(token._.inflect('JJS'))
                 
         options = list(set(options))
+
+        if adj.istitle():
+            options = [x.title() for x in options]
         
         row['sentence_without_word'] = sentence_without_word
         row['answer'] = adj
