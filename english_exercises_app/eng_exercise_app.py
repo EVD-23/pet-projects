@@ -270,10 +270,10 @@ with st.form("my_form"):
                         "'Little Red Riding' Hood Charles Perrault"))
     
     if example == "'Little Red Cap' Jacob_and_Wilhelm_Grimm":
-        with open(r"https://github.com/EVD-23/pet-projects/blob/main/english_exercises_app/red_hat/Little_Red_Cap_%20Jacob_and_Wilhelm_Grimm.txt") as f:
+        with open(r"english_exercises_app/red_hat/Little_Red_Cap_ Jacob_and_Wilhelm_Grimm.txt") as f:
             text = f.read()
     elif example == "'Little Red Riding' Hood Charles Perrault":
-        with open(r"https://github.com/EVD-23/pet-projects/blob/main/english_exercises_app/red_hat/Little_Red_Riding_Hood_Charles_Perrault.txt") as f:
+        with open(r"english_exercises_app/red_hat/Little_Red_Riding_Hood_Charles_Perrault.txt") as f:
             text = f.read()
     else:
         pass
